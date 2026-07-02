@@ -3,10 +3,8 @@
 configfile: "config.yaml"
 
 # Config Params
-SAMPLES = config["samples"]
 START_FROM = config.get("start_from", "pod5")
 OUTPUT_DIR = config["output_dir"]
-INPUT_DIR = config["input_dir"]
 REFERENCE = config["reference"]
 REFERENCE_NAME = config["reference_name"]
 REFERENCE_TE = config["reference_TE"]
@@ -66,20 +64,193 @@ DO_FILTER = (MIN_READ_QUAL > 0) or (MIN_READ_LENGTH > 0)
 # Take into account filtering the longTR VCF prior to methylation analysis
 TR_VCF_FOR_METH = f"{OUTPUT_DIR}/06_TR_calling/{{sample}}/{REFERENCE_NAME}/{{sample}}_{REFERENCE_NAME}_TRs_{TYPE_OF_TR}_for_methylation.vcf.gz"
 
-# Where to read *raw* FASTQs from (when START_FROM == "fastq").
-# Falls back to the pipeline's default OUTPUT location if not provided.
-FASTQ_DIR = config.get("fastq_dir", f"{OUTPUT_DIR}/00_raw_data/basecalled/fastq")
+
+# ==================================================================
+# INPUT RESOLUTION
+# ------------------------------------------------------------------
+# Samples and the location of each sample's starting file can be
+# provided in two ways (the manifest takes priority if both are given):
+#
+#   1. manifest:      a TSV/CSV file with one row per sample and at
+#                     least the columns 'sample' and 'input'
+#                     (optional 'input_index' for aligned BAMs).
+#   2. sample_inputs: an inline mapping in the config of
+#                     sample_name -> /path/to/input.
+#
+# A single global 'start_from' applies to every sample in the run.
+# 'input' points directly at the starting file for that sample
+# (a .pod5 directory, a .ubam, a .fastq, an aligned .bam, or an
+# aligned .cram); it can live anywhere on disk with any filename.
+# ==================================================================
+
+VALID_START_FROM = {"pod5", "ubam", "fastq", "bam", "cram"}
+
+if START_FROM not in VALID_START_FROM:
+    raise WorkflowError(
+        f"Invalid 'start_from' value: {START_FROM!r}. "
+        f"Choose one of: {', '.join(sorted(VALID_START_FROM))}."
+    )
 
 
-# helper functions
+def _load_manifest(path):
+    """Parse a TSV/CSV manifest into an ordered {sample: {input, index}} dict.
+    Blank lines and lines beginning with '#' (comments) are ignored; the first
+    remaining line is treated as the header."""
+    if not os.path.isfile(path):
+        raise WorkflowError(f"manifest file not found: {path}")
+
+    with open(path, newline="") as fh:
+        lines = [ln for ln in fh
+                 if ln.strip() and not ln.lstrip().startswith("#")]
+
+    if not lines:
+        raise WorkflowError(f"manifest is empty (no header row): {path}")
+
+    delimiter = "\t" if "\t" in lines[0] else ","
+    reader = csv.DictReader(lines, delimiter=delimiter)
+
+    if reader.fieldnames is None:
+        raise WorkflowError(f"manifest is empty: {path}")
+
+    # normalise header names (case/space-insensitive)
+    norm = {name: (name or "").strip().lower() for name in reader.fieldnames}
+
+    table = {}
+    for i, raw in enumerate(reader, start=2):  # row 1 is the header
+        row = {norm[k]: (v.strip() if isinstance(v, str) else v)
+               for k, v in raw.items() if k in norm}
+        sample = row.get("sample") or row.get("sample_id") or row.get("name")
+        input_path = row.get("input") or row.get("path")
+        index_path = row.get("input_index") or row.get("index") or None
+
+        if not sample:
+            raise WorkflowError(
+                f"manifest {path}: row {i} is missing a 'sample' value.")
+        if not input_path:
+            raise WorkflowError(
+                f"manifest {path}: sample {sample!r} is missing an 'input' path.")
+        if sample in table:
+            raise WorkflowError(
+                f"manifest {path}: duplicate sample {sample!r}.")
+
+        table[sample] = {"input": input_path, "index": index_path or None}
+
+    if not table:
+        raise WorkflowError(f"manifest contains no samples: {path}")
+    return table
+
+
+# ---- Build the sample -> input table from the chosen source ----
+MANIFEST = config.get("manifest")
+SAMPLE_INPUTS_CFG = config.get("sample_inputs")
+
+if MANIFEST:
+    SAMPLE_INPUTS = _load_manifest(MANIFEST)
+elif isinstance(SAMPLE_INPUTS_CFG, dict) and SAMPLE_INPUTS_CFG:
+    SAMPLE_INPUTS = {s: {"input": p, "index": None}
+                     for s, p in SAMPLE_INPUTS_CFG.items()}
+else:
+    raise WorkflowError(
+        "No samples defined. Provide either a 'manifest' or a "
+        "'sample_inputs' mapping in the config.")
+
+SAMPLES = list(SAMPLE_INPUTS.keys())
+
+
+# ---- Canonical / source paths for aligned BAM inputs ----
+def _canonical_bam(sample):
+    """Where the rest of the pipeline expects the aligned BAM to be."""
+    return f"{OUTPUT_DIR}/01_alignment/{sample}/{REFERENCE_NAME}/{sample}_{REFERENCE_NAME}_sorted.bam"
+
+def _source_bam(sample):
+    """Where the user's aligned BAM actually is (the path they provided)."""
+    return SAMPLE_INPUTS[sample]["input"]
+
+def _source_cram(sample):
+    """Where the user's aligned CRAM actually is (the path they provided)."""
+    return SAMPLE_INPUTS[sample]["input"]
+
+
+# ---- Sample subsets (needed to keep the alignment / bam-ingest rules
+#      unambiguous). With a single global start_from these are either all
+#      or none, but they are computed generically. ----
+ALIGN_SAMPLES = [s for s in SAMPLES if START_FROM not in ("bam", "cram")]
+# Ingest (symlink) a BAM only when its source differs from the canonical
+# output location; if they are identical the file already sits where it is
+# needed and no rule — and no symlink-to-itself — is required.
+BAM_INGEST_SAMPLES = [
+    s for s in SAMPLES
+    if START_FROM == "bam"
+    and os.path.abspath(_source_bam(s)) != os.path.abspath(_canonical_bam(s))
+]
+# Decode a user-supplied aligned CRAM into the canonical sorted BAM. A CRAM is
+# reference-compressed and cannot be symlinked like a BAM, so every cram-mode
+# sample is materialised into a real BAM by the cram_to_bam rule.
+CRAM_CONVERT_SAMPLES = [s for s in SAMPLES if START_FROM == "cram"]
+
+
+def samples_regex(sample_list):
+    """Anchored alternation for use in per-rule wildcard_constraints.
+    Falls back to a token that cannot match any real sample when empty."""
+    return "|".join(re.escape(s) for s in sample_list) if sample_list else "__no_sample__"
+
+
+# ==================================================================
+# INPUT RESOLVER FUNCTIONS (used as rule inputs)
+# ==================================================================
+
+def get_pod5_dir(wc):
+    """pod5 directory for basecalling (the path the user provided)."""
+    return SAMPLE_INPUTS[wc.sample]["input"]
+
+
+def get_input_ubam(wc):
+    """uBAM feeding ubam_to_fastq.
+    For pod5 runs this is the basecalling output; for ubam runs it is the
+    user-provided file."""
+    if START_FROM == "pod5":
+        # produced by the basecalling rule into the output tree
+        return f"{OUTPUT_DIR}/00_raw_data/basecalled/ubam/{wc.sample}/{wc.sample}_unaligned.bam"
+    return SAMPLE_INPUTS[wc.sample]["input"]
+
+
 def raw_fastq(wc):
-    return f"{FASTQ_DIR}/{wc.sample}/{wc.sample}.fastq"
+    """Unfiltered FASTQ used for pre-filtering QC and for filtering.
+    For fastq runs this is the user-provided file; for pod5/ubam runs it is
+    produced by ubam_to_fastq at the canonical location."""
+    if START_FROM == "fastq":
+        return SAMPLE_INPUTS[wc.sample]["input"]
+    return f"{OUTPUT_DIR}/00_raw_data/basecalled/fastq/{wc.sample}/{wc.sample}.fastq"
+
 
 def fastq_for_pipeline(wc):
+    """FASTQ handed to the aligner: filtered when filtering is on, otherwise
+    the raw FASTQ resolved above."""
     if DO_FILTER:
         return f"{OUTPUT_DIR}/00_raw_data/basecalled/fastq/{wc.sample}/{wc.sample}_filtered.fastq"
-    else:
-        return f"{OUTPUT_DIR}/00_raw_data/basecalled/fastq/{wc.sample}/{wc.sample}.fastq"
+    return raw_fastq(wc)
+
+
+def get_input_bam(wc):
+    """User-provided aligned BAM (only used by the ingest_bam rule)."""
+    return _source_bam(wc.sample)
+
+
+def get_input_cram(wc):
+    """User-provided aligned CRAM (only used by the cram_to_bam rule)."""
+    return _source_cram(wc.sample)
+
+
+def get_input_bai(wc):
+    """Path to a user-provided BAM index, if any, else empty string.
+    Tried in order: explicit 'input_index', then '<source_bam>.bai' next to it."""
+    entry = SAMPLE_INPUTS[wc.sample]
+    if entry["index"]:
+        return entry["index"]
+    candidate = _source_bam(wc.sample) + ".bai"
+    if os.path.exists(candidate):
+        return candidate
+    return ""
 
 def get_haploid_chromosomes(csv_path):
     with open(csv_path) as f:
@@ -109,8 +280,9 @@ elif START_FROM == "fastq":
         expand(f"{OUTPUT_DIR}/qc/fastq/pre_filtering/{{sample}}/{{sample}}_fastq_NanoPlot-report.html", sample=SAMPLES),
         expand(f"{OUTPUT_DIR}/01_alignment/{{sample}}/{REFERENCE_NAME}/{{sample}}_{REFERENCE_NAME}_sorted.bam", sample=SAMPLES)
     ])
-elif START_FROM == "bam":
-    # no basecalling or alignment outputs expected
+elif START_FROM in ("bam", "cram"):
+    # no basecalling or alignment outputs expected; the canonical sorted BAM is
+    # produced on demand (symlinked for bam, decoded for cram) by the DAG.
     pass
 else:
     print(f"ERROR: Invalid 'start_from' value in config.yaml: {START_FROM}")

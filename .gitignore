@@ -21,6 +21,8 @@ profiles/brando_profile
 !test_data/**
 !configs/
 !configs/pipeline_config.yaml
+!configs/manifest_ubam_local.tsv
+!configs/config_local_manifest.yaml
 !profiles/
 !profiles/HPC_profile/
 !profiles/HPC_profile/config.yaml

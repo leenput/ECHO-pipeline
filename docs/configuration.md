@@ -53,17 +53,17 @@ The following arguments must always be supplied:
 - `--output`  
   Path where the generated YAML file will be written
 
-- `--samples`  
-  One or more sample identifiers (space-separated)
+- `--sample-input SAMPLE PATH`  
+  A sample identifier and the path to its starting file. Repeat the flag once
+  per sample (e.g. `--sample-input HG002 /data/HG002.bam --sample-input HG003 /data/HG003.bam`).
+  `PATH` must match `--start-from` (a `.pod5` directory, `.ubam`, `.fastq`,
+  `.bam`, or `.cram`) and may live anywhere on disk with any filename.
 
 - `--start-from`  
-  Input data type: `pod5`, `ubam`, `fastq`, or `bam`
-
-- `--input-dir`  
-  Project input directory (must exist)
+  Input data type: `pod5`, `ubam`, `fastq`, `bam`, or `cram`
 
 - `--output-dir`  
-  Project output directory (usually the same as input)
+  Project output directory
 
 - `--reference`  
   Path to the reference genome FASTA file
@@ -85,9 +85,9 @@ Example usage:
 ```
 python scripts/make_config_tiny.py init \  
   --output config.yaml \
-  --samples HG002 HG003 \
+  --sample-input HG002 /path/to/HG002.fastq \
+  --sample-input HG003 /path/to/HG003.fastq \
   --start-from fastq \
-  --input-dir /path/to/project \
   --output-dir /path/to/project \
   --reference /path/to/GRCh38.fa \
   --reference-name GRCh38 \
@@ -125,9 +125,9 @@ Example usage:
 ```
 python scripts/make_config_tiny.py init \
   --output config.yaml \
-  --samples SAMPLE1 SAMPLE2 \
+  --sample-input SAMPLE1 /path/to/sample1.ubam \
+  --sample-input SAMPLE2 /path/to/sample2.ubam \
   --start-from ubam \
-  --input-dir /path/to/inputs \
   --output-dir /path/to/results \
   --reference /path/to/chm13v2.fa \
   --reference-name chm13v2 \

@@ -1,0 +1,6 @@
+# ECHO input manifest (tab-separated) for the local CRAM test run.
+# start_from: cram  ->  'input' is an aligned .cram; it is decoded into a BAM
+# against the configured 'reference' (must be the exact genome the CRAM was
+# encoded against). No index needed.
+sample	input
+HG001_subset	/mnt/ngs/projects/Nanopore_pipeline/users/lfw156/test_pipeline_revision/cram_file_test/HG001_subset_GRCh38_sorted.cram

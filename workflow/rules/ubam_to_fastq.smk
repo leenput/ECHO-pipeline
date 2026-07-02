@@ -3,7 +3,7 @@
 # conversion of ubam to fastq
 rule ubam_to_fastq:
     input:
-        unaligned_bam=f"{OUTPUT_DIR}/00_raw_data/basecalled/ubam/{{sample}}/{{sample}}_unaligned.bam"
+        unaligned_bam=get_input_ubam
     output:
         fastq=f"{OUTPUT_DIR}/00_raw_data/basecalled/fastq/{{sample}}/{{sample}}.fastq"
     log:

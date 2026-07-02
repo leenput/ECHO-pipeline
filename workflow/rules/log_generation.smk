@@ -93,7 +93,6 @@ rule create_log:
             f.write(f"SAMPLES: {SAMPLES}\n")
             f.write(f"START_FROM: {START_FROM}\n")
             f.write(f"OUTPUT_DIR: {OUTPUT_DIR}\n")
-            f.write(f"INPUT_DIR: {INPUT_DIR}\n")
             f.write(f"REFERENCE: {REFERENCE}\n")
             f.write(f"REFERENCE_TE: {REFERENCE_TE}\n")
             f.write(f"TR_CATALOG: {TR_CATALOG}\n")

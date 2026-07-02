@@ -1,15 +1,41 @@
-samples:
-  - {sample_name}
-  - {sample_name}
+start_from: "ubam" #Options: "pod5", "ubam", "fastq", "bam", "cram". Applies to all samples in the run.
 
-start_from: "ubam" #Options: "pod5", "ubam", "fastq", "bam".
+# ==================================================================
+# SAMPLES & INPUT FILES
+# ------------------------------------------------------------------
+# Choose ONE of the two ways below to declare your samples and where
+# each sample's starting file lives. If both are given, the manifest
+# takes priority.
+#
+# The starting file may live ANYWHERE on disk with ANY filename; it must
+# match 'start_from' above:
+#   pod5  -> a directory containing .pod5 files
+#   ubam  -> an unaligned .bam
+#   fastq -> a .fastq
+#   bam   -> an aligned, indexed .bam (index optional, see manifest)
+#   cram  -> an aligned .cram (decoded into a BAM against 'reference')
+# ------------------------------------------------------------------
+
+# --- Option 1: manifest file (recommended for multiple samples) ---
+# A TSV or CSV with a header and one row per sample. Columns:
+#   sample        (required)  unique sample name
+#   input         (required)  path to the starting file / pod5 directory
+#   input_index   (optional)  path to a .bai (only used when start_from: bam;
+#                             if omitted, a '<input>.bai' next to the BAM is
+#                             used, otherwise one is built automatically)
+# See configs/manifest_example.tsv for a template.
+#
+# manifest: "/path/to/samples.tsv"
+
+# --- Option 2: inline sample -> input mapping ---
+sample_inputs:
+  {sample_name}: "/abs/path/to/sample1.bam"
+  {sample_name}: "/data/run7/sample2.bam"
 
 # ------------------------------------------------------------------
-# USER INPUT / OUTPUT DIRECTORIES
-# Replace with the directories containing your data
+# OUTPUT DIRECTORY (always required)
 # ------------------------------------------------------------------
 
-input_dir: "/path/to/projects/{project_name}/"
 output_dir: "/path/to/projects/{project_name}/"
 
 # ------------------------------------------------------------------

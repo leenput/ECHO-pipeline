@@ -13,16 +13,19 @@ def parse_args():
     # required outputs
     init.add_argument("--output", required=True, help="Path to write config.yaml")
 
-    # samples
-    init.add_argument("--samples", nargs="+", required=True,
-                      help="Sample IDs (space-separated)")
+    # samples: one --sample-input per sample, mapping a sample ID to the path of
+    # its starting file (a .pod5 directory, .ubam, .fastq, aligned .bam, or
+    # aligned .cram).
+    init.add_argument("--sample-input", nargs=2, action="append", required=True,
+                      metavar=("SAMPLE", "PATH"), dest="sample_input",
+                      help="Sample ID and path to its input file "
+                           "(repeat for multiple samples)")
 
     # pipeline control
     init.add_argument("--start-from",
-                      choices=["pod5", "ubam", "fastq", "bam"],
+                      choices=["pod5", "ubam", "fastq", "bam", "cram"],
                       required=True)
 
-    init.add_argument("--input-dir", required=True)
     init.add_argument("--output-dir", required=True)
 
     # reference genome
