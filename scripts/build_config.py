@@ -19,9 +19,16 @@ def build_config(args):
     cfg = {}
 
     # ---- basic fields (always present) ----
-    cfg["samples"] = sorted(set(args.samples))
     cfg["start_from"] = args.start_from
-    cfg["input_dir"] = args.input_dir
+
+    # inline sample -> input mapping (one entry per --sample-input)
+    sample_inputs = {}
+    for sample, path in args.sample_input:
+        if sample in sample_inputs:
+            raise ValueError(f"duplicate sample in --sample-input: {sample!r}")
+        sample_inputs[sample] = path
+    cfg["sample_inputs"] = sample_inputs
+
     cfg["output_dir"] = args.output_dir
     cfg["reference"] = args.reference
     cfg["reference_name"] = args.reference_name

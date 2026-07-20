@@ -51,14 +51,41 @@ bash scripts/download_repeat_catalogs.sh # download the repeat catalogs in curre
 ---
   
 ### **Prepare input files**  
-To run the pipeline, ECHO accepts input files in one of the below formats. The chosen starting file format should be stored in a predefined directory in order to be detected by the pipeline. Based on your chosen starting file format, store it in the following path:
+ECHO accepts input in one of the following formats, set once for the whole run via `start_from`:
 
-| Format  | Starting Directory                                                                    |
-| ------- | --------------------------------------------------------------------------------- |
-| `.pod5` | /path/to/projects/{project_name}/00_raw_data/pod5/{sample_name}/<your-file.pod5> |
-| `.ubam` | /path/to/projects/{project_name}/00_raw_data/basecalled/ubam/{sample_name}/<your-file.bam>  |
-| `.fastq` | /path/to/projects/{project_name}/00_raw_data/basecalled/fastq/{sample_name}/<your-file.fastq> |
-| `.bam` (with index `.bai`)  | /path/to/projects/{project_name}/01_alignment/{sample_name}/GRCh38/<your-file.bam> and /path/to/projects/{project_name}/01_alignment/{sample_name}/GRCh38/<your-file.bam.bai> |
+| `start_from` | Expected `input` |
+| --- | --- |
+| `pod5`  | a directory containing `.pod5` files |
+| `ubam`  | an unaligned `.bam` |
+| `fastq` | a `.fastq` |
+| `bam`   | an aligned `.bam` (an index is optional — see below) |
+| `cram`  | an aligned `.cram` (decoded against `reference` into an aligned BAM) |
+
+You can point ECHO at input files **anywhere on disk, with any filename**. There are two ways to declare your samples and their inputs (if both are given, the manifest takes priority):
+
+#### 1. Manifest file (recommended for multiple samples)
+
+Provide a TSV (or CSV) with a header and one row per sample, then reference it in the config with `manifest: /path/to/samples.tsv`. Columns:
+
+| Column | Required | Description |
+| --- | --- | --- |
+| `sample` | yes | Unique sample name |
+| `input` | yes | Path to the starting file (or pod5 directory) |
+| `input_index` | no | Path to a `.bai` (only used when `start_from: bam`). If omitted, ECHO looks for `<input>.bai` next to the BAM, and otherwise builds the index automatically. |
+
+A template is provided in [`configs/manifest_example.tsv`](configs/manifest_example.tsv).
+
+#### 2. Inline `sample_inputs` mapping
+
+For a small number of samples you can list them directly in the config:
+
+```yaml
+sample_inputs:
+  SAMPLE1: /abs/path/to/sample1.bam
+  SAMPLE2: /data/run7/sample2.bam
+```
+
+> Aligned BAMs (`start_from: bam`) supplied via a manifest or `sample_inputs` are **symlinked** into the pipeline's `01_alignment/` layout — no data is copied. Aligned CRAMs (`start_from: cram`) cannot be symlinked because they are reference-compressed, so they are **decoded** into a BAM (using the configured `reference`) at that same location.
 
 ---
 
@@ -83,7 +110,7 @@ You can hard-code this file (you can find an example in `configs/project_config.
 
 The configuration defines:
 - Sample IDs
-- Input format (`.pod5`, `.ubam`, or `.bam`)
+- Input format (`.pod5`, `.ubam`, `.fastq`, `.bam`, or `.cram`)
 - Project input and output directories
 - Reference genome (`GRCh38` or `T2T-CHM13v2`)
 - TR and TE catalogs
@@ -96,14 +123,16 @@ To quickly get started using the bundled ECHO repeat catalogs and sensible defau
 ```bash
 python scripts/make_config_tiny.py init \
   --output configs/<config-name>.yaml \
-  --samples SAMPLE1 SAMPLE2 \
-  --start-from ubam \
-  --input-dir /path/to/project \
+  --sample-input SAMPLE1 /path/to/sample1.bam \
+  --sample-input SAMPLE2 /path/to/sample2.bam \
+  --start-from bam \
   --output-dir /path/to/project \
   --reference /path/to/GRCh38.fa \
   --reference-name GRCh38 \
   --use-bundled-db
 ```
+
+Repeat `--sample-input SAMPLE PATH` once per sample; `PATH` points directly at that sample's starting file (a `.pod5` directory, `.ubam`, `.fastq`, `.bam`, or `.cram`) and must match `--start-from`.
 
 > 📄 For full configuration details and advanced usage, see [`docs/configuration.md`](docs/configuration.md)
 

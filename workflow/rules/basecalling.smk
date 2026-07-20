@@ -2,7 +2,7 @@
 
 rule basecalling:
     input:
-        pod5_dir=f"{INPUT_DIR}/00_raw_data/pod5/{{sample}}/"
+        pod5_dir=get_pod5_dir
     output:
         unaligned_bam=f"{OUTPUT_DIR}/00_raw_data/basecalled/ubam/{{sample}}/{{sample}}_unaligned.bam",
         summary_file=f"{OUTPUT_DIR}/qc/basecalling/{{sample}}/{{sample}}_summary.tsv"

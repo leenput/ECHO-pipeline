@@ -1,0 +1,30 @@
+# Same analysis as config_local.yaml, but samples/inputs are declared via a
+# manifest instead of the 'samples' list + 'input_dir' directory convention.
+
+start_from: "cram" #Options: "pod5", "ubam", "fastq", "bam", "cram".
+
+# Samples and input files come from the manifest (see configs/manifest_ubam_local.tsv).
+# 'input_dir' is not needed in manifest mode; 'output_dir' is still required.
+manifest: "/mnt/ngs/projects/Nanopore_pipeline/users/lfw156/repeatome_pipeline/configs/manifest_ubam_local.tsv"
+output_dir: "/mnt/ngs/projects/Nanopore_pipeline/users/lfw156/test_pipeline_revision"
+
+reference: "/mnt/ngs/projects/Nanopore_pipeline/users/lfw156/ref_genome/hg38-GCA_000001405.15_GRCh38_no_alt_analysis_set.fa"
+reference_name: "GRCh38" #"chm13v2" or "GRCh38"
+reference_TE: "/mnt/ngs/projects/Nanopore_pipeline/users/lfw156/repeatome_pipeline/repeat-catalogs/TEs/teref.ont.human.fa"
+
+fastq_filtering:
+  min_read_quality: 0
+  min_read_length: 500
+
+# small TR catalog (ideal for testing)
+tr_catalog: "/mnt/ngs/projects/Nanopore_pipeline/users/lfw156/repeatome_pipeline/repeat-catalogs/TRs/GRCh38/pathogenic/STRchive-disease-loci.v2.2.1.GRCh38.longTR.bed"
+type_of_tr: "pathogenic" #Modify according to TR catalog used (genome-wide, genome-wide-str, pathogenic, forensic)
+
+# small TE catalog (ideal for testing)
+te_catalog: "/mnt/ngs/projects/Nanopore_pipeline/users/lfw156/repeatome_pipeline/repeat-catalogs/TEs/GRCh38/TE_classes/GRCh38_TEs_retroposon.bed"
+type_of_te: "retroposon" #Options: all, all_cpg, DNA, DNA_cpg, LINE, LINE_cpg, helitron, helitron_cpg, SINE, SINE_cpg, LTR, LTR_cpg, retroposon, retroposon_cpg
+
+flanking_length_bp: "250" #Description: flanking regions to be analysed for methylation and sequence variation
+extension_repeat_consensus: "1000" #Description: number of bases to extend repeat consensus with for re-mapping
+
+haploid_chrs: "chrM,chrX,chrY"

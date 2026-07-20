@@ -4,18 +4,25 @@ from pathlib import Path
 def _file_exists(p):
     return p and Path(p).is_file()
 
-def _dir_exists(p):
-    return p and Path(p).is_dir()
-
 def validate_config(cfg):
     errors = []
 
-    for k in ["samples", "input_dir", "output_dir", "reference"]:
+    for k in ["output_dir", "reference"]:
         if k not in cfg:
             errors.append(f"Missing required field: {k}")
 
-    if not _dir_exists(cfg["input_dir"]):
-        errors.append(f"input_dir not found: {cfg['input_dir']}")
+    # Samples/inputs are declared via a manifest or an inline sample_inputs
+    # mapping (the manifest takes priority if both are given).
+    manifest = cfg.get("manifest")
+    sample_inputs = cfg.get("sample_inputs")
+
+    if not (manifest or sample_inputs):
+        errors.append(
+            "No samples defined: provide either a 'manifest' or a "
+            "'sample_inputs' mapping.")
+
+    if manifest and not _file_exists(manifest):
+        errors.append(f"manifest file not found: {manifest}")
 
     if not _file_exists(cfg["reference"]):
         errors.append(f"reference FASTA not found: {cfg['reference']}")
