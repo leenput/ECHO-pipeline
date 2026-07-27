@@ -4,6 +4,7 @@
 ## TABLE OF CONTENTS
 - [Introduction](#introduction)
 - [Pipeline overview](#pipeline-overview)
+- [Quick start](#quick-start)
 - [Setting up](#setting-up-the-pipeline)
   - [Installation](#installation)
   - [Input Files](#prepare-input-files)
@@ -32,7 +33,43 @@ For more information on all the tools used, see [`docs/tools.md`](docs/tools.md)
 
 ---
 
+## QUICK START
+
+New to ECHO? Follow the
+[cookbook-style Quick Start](docs/ECHO_quickstart.md) for complete,
+copy-ready examples covering project configuration, SLURM profile setup,
+workflow validation, execution, monitoring and output inspection.
+
+Choose the recipe that matches your starting data:
+
+| Starting data | Quick-start recipe | Main steps performed by ECHO |
+|---|---|---|
+| Unaligned BAM or FASTQ | [Recipe 1](docs/quickstart.md#recipe-1-start-from-unaligned-bam-or-fastq) | Read preprocessing, alignment, variant calling, phasing, repeat genotyping and methylation analysis |
+| Aligned BAM or CRAM | [Recipe 2](docs/quickstart.md#recipe-2-start-from-aligned-bam-or-cram) | Variant calling, phasing, repeat genotyping and methylation analysis |
+| POD5 | [Recipe 3](docs/quickstart.md#recipe-3-start-from-pod5) | Dorado basecalling followed by the complete ECHO workflow |
+
+The Quick Start distinguishes between:
+
+- the **project configuration**, which defines the samples, inputs,
+  reference genome, repeat catalogs and analysis parameters; and
+- the **execution profile**, which defines scheduler-specific settings,
+  resource requests and Singularity bind mounts.
+
+For all available options, see the
+[configuration reference](docs/configuration.md).
+For descriptions of the generated files, see the
+[output reference](docs/output.md).
+
+---
+
+
 ## SETTING UP THE PIPELINE
+
+> [!TIP]
+> The sections below provide a concise reference for installation and
+> configuration. For a complete step-by-step SLURM workflow, including
+> cluster-profile adaptation and separate examples for each input type,
+> see the [cookbook-style Quick Start](docs/quickstart.md).
 
 Ensure the following are installed and available in your environment:
 
@@ -197,12 +234,29 @@ In the same profile `config.yaml`, adapt the settings to match your compute infr
 
 ## RUNNING THE PIPELINE
   
-Run the pipeline from the root directory of the repository (both in HPC or local environments):
+Run the pipeline from the root directory of the repository (both in HPC or local environments).
+
+First validate the configuration and planned jobs:
 
 ```bash
-snakemake --snakefile workflow/Snakefile --profile profiles/HPC_profile
+snakemake \
+  --profile profiles/slurm_profile \
+  --configfile configs/<project-config>.yaml \
+  --dry-run \
+  --printshellcmds
 ```
-Alternatively, if you are outside the project directory, provide the full path to the `Snakefile` and the profile directory
+
+After the dry run completes successfully, start the workflow:
+
+```bash
+snakemake \
+  --profile profiles/slurm_profile \
+  --configfile configs/<project-config>.yaml
+```
+Alternatively, if you are outside the project directory, provide the full path to the `Snakefile` (--snakefile path/to/Snakefile) and the profile directory 
+
+For guidance on adapting the profile to a SLURM cluster, monitoring jobs,
+resuming interrupted workflows and troubleshooting common errors, see the [cookbook-style Quick Start](docs/ECHO_quickstart.md)
 
 ---
 
