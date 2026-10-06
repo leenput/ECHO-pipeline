@@ -10,37 +10,49 @@ include: "rules/setup_and_targets.smk"
 # Create a logfile 
 include: "rules/log_generation.smk"
 
-# -------  STEP 0: PREPROCESSING  -------
+# ============================================================
+# UPSTREAM PROCESSING
+# Skip this entire section when resuming from phased outputs
+# ============================================================
 
-# basecalling
-if START_FROM == "pod5":
-    include: "rules/basecalling.smk"
-    include: "rules/ubam_to_fastq.smk"
+if not RESUME_FROM_PHASED: 
 
-# ubam to fastq conversion
-elif START_FROM == "ubam":
-    include: "rules/ubam_to_fastq.smk"
+    # -------  STEP 0: PREPROCESSING  -------
+
+    # basecalling
+    if START_FROM == "pod5":
+        include: "rules/basecalling.smk"
+        include: "rules/ubam_to_fastq.smk"
+
+    # ubam to fastq conversion
+    elif START_FROM == "ubam":
+        include: "rules/ubam_to_fastq.smk"
 
 
-# fastq QC: quality control and read filtering 
-include: "rules/QC_fastq.smk"
+    # fastq QC: quality control and read filtering 
+    include: "rules/QC_fastq.smk"
 
-# -------  STEP 1: ALIGNMENT -------
+    # -------  STEP 1: ALIGNMENT -------
 
-include: "rules/alignment.smk"
+    include: "rules/alignment.smk"
 
-# -------  STEP 2: VARIANT CALLING -------
+    # -------  STEP 2: VARIANT CALLING -------
 
-# SNVs and Indels
-include: "rules/variant_calling_snps_indels.smk"
+    # SNVs and Indels
+    include: "rules/variant_calling_snps_indels.smk"
 
-# SVs
-include: "rules/variant_calling_sv.smk"
+    # SVs
+    include: "rules/variant_calling_sv.smk"
 
-# -------  STEP 3: PHASING AND HAPLOTAGGING -------
+    # -------  STEP 3: PHASING AND HAPLOTAGGING -------
 
-# Phasing 
-include: "rules/phasing.smk"
+    # Phasing 
+    include: "rules/phasing.smk"
+
+# ============================================================
+# DOWNSTREAM PROCESSING
+# Always available
+# ============================================================
 
 # VCF filtering
 include: "rules/VCF_filtering.smk"

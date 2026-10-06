@@ -5,6 +5,9 @@ configfile: "config.yaml"
 # Config Params
 SAMPLES = config["samples"]
 START_FROM = config.get("start_from", "pod5")
+RESUME_FROM_PHASED = bool(
+    config.get("resume_from_phased", False)
+)
 OUTPUT_DIR = config["output_dir"]
 INPUT_DIR = config["input_dir"]
 REFERENCE = config["reference"]
@@ -95,30 +98,37 @@ all_inputs = []
 
 #all_inputs.append(LOGFILE)
 
-if START_FROM == "pod5":
-    all_inputs.extend([
-        expand(f"{OUTPUT_DIR}/00_raw_data/basecalled/ubam/{{sample}}/{{sample}}_unaligned.bam", sample=SAMPLES),
-        expand(f"{OUTPUT_DIR}/qc/basecalling/{{sample}}/{{sample}}_summary.tsv", sample=SAMPLES),
-    ])
-elif START_FROM == "ubam":
-    all_inputs.extend([
-        expand(f"{OUTPUT_DIR}/qc/fastq/pre_filtering/{{sample}}/{{sample}}_fastq_NanoPlot-report.html", sample=SAMPLES),
-    ])
-elif START_FROM == "fastq":
-    all_inputs.extend([
-        expand(f"{OUTPUT_DIR}/qc/fastq/pre_filtering/{{sample}}/{{sample}}_fastq_NanoPlot-report.html", sample=SAMPLES),
-        expand(f"{OUTPUT_DIR}/01_alignment/{{sample}}/{REFERENCE_NAME}/{{sample}}_{REFERENCE_NAME}_sorted.bam", sample=SAMPLES)
-    ])
-elif START_FROM == "bam":
-    # no basecalling or alignment outputs expected
-    pass
-else:
-    print(f"ERROR: Invalid 'start_from' value in config.yaml: {START_FROM}")
-    exit(1)
+
+if not RESUME_FROM_PHASED: 
+
+    if START_FROM == "pod5":
+        all_inputs.extend([
+            expand(f"{OUTPUT_DIR}/00_raw_data/basecalled/ubam/{{sample}}/{{sample}}_unaligned.bam", sample=SAMPLES),
+            expand(f"{OUTPUT_DIR}/qc/basecalling/{{sample}}/{{sample}}_summary.tsv", sample=SAMPLES),
+        ])
+    elif START_FROM == "ubam":
+        all_inputs.extend([
+            expand(f"{OUTPUT_DIR}/qc/fastq/pre_filtering/{{sample}}/{{sample}}_fastq_NanoPlot-report.html", sample=SAMPLES),
+        ])
+    elif START_FROM == "fastq":
+        all_inputs.extend([
+            expand(f"{OUTPUT_DIR}/qc/fastq/pre_filtering/{{sample}}/{{sample}}_fastq_NanoPlot-report.html", sample=SAMPLES),
+            expand(f"{OUTPUT_DIR}/01_alignment/{{sample}}/{REFERENCE_NAME}/{{sample}}_{REFERENCE_NAME}_sorted.bam", sample=SAMPLES)
+        ])
+    elif START_FROM == "bam":
+        # no basecalling or alignment outputs expected
+        pass
+    else:
+        print(f"ERROR: Invalid 'start_from' value in config.yaml: {START_FROM}")
+        exit(1)
 
 
 #Add filtered fastq output when filtering is applied
-if START_FROM == "fastq" and DO_FILTER:
+if (
+    not RESUME_FROM_PHASED
+    and START_FROM == "fastq" 
+    and DO_FILTER
+):
     all_inputs.extend([
         expand(f"{OUTPUT_DIR}/00_raw_data/basecalled/fastq/{{sample}}/{{sample}}_filtered.fastq", sample=SAMPLES)
     ])
